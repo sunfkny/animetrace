@@ -1,0 +1,14 @@
+[project]
+name = "animetrace"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.28.1", "pydantic>=2.0", "typer>=0.15.2"]
+
+[project.scripts]
+animetrace = "animetrace.__main__:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
