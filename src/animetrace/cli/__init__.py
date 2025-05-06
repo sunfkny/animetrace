@@ -12,7 +12,7 @@ app = typer.Typer(no_args_is_help=True)
 @app.command(no_args_is_help=True)
 def search(
     file_or_url: Annotated[str, typer.Argument()],
-    model: Annotated[SearchModel, typer.Option()] = "anime",
+    model: Annotated[SearchModel, typer.Option()] = SearchModel.anime,
     base_url: Annotated[
         str, typer.Option(help="The base URL for AnimeTrace API")
     ] = "https://api.animetrace.com",

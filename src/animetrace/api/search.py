@@ -1,16 +1,21 @@
+import enum
 import pathlib
 import unicodedata
-from typing import Literal
 
 import httpx
 import pydantic
 
-SearchModel = Literal[
-    "anime_model_lovelive",  # 高级动画识别模型①
-    "pre_stable",  # 高级动画识别模型②
-    "anime",  # 普通动画识别模型
-    "full_game_model_kira",  # 高级Gal识别模型
-]
+
+class SearchModel(str, enum.Enum):
+    anime = "anime"
+    """低精度动画模型(编号: gochiusa)"""
+    pre_stable = "pre_stable"
+    """①高精度动画模型(编号: aqours)"""
+    anime_model_lovelive = "anime_model_lovelive"
+    """②高精度动画模型(编号: lovelive)"""
+    full_game_model_kira = "full_game_model_kira"
+    """③GalGame模型(编号: kira)"""
+
 
 code2error = {
     17701: "图片大小过大",
@@ -25,6 +30,23 @@ code2error = {
     17710: "图片验证码错误",
     17711: "无法完成识别前准备工作（请重试）",
     17712: "需要图片名称",
+    17720: "识别成功",
+    17721: "服务器正常运行中",
+    17722: "图片下载失败",
+    17723: "未指定 Content-Length",
+    17724: "不是图片文件或未指定",
+    17725: "未指定图片",
+    17726: "JSON 不接受包含文件",
+    17727: "Base64 格式错误",
+    17728: "已达到本次使用上限",
+    17729: "未找到选择的模型",
+    17730: "检测 AI 图片失败",
+    17731: "服务利用人数过多，请重试",
+    17732: "已过期",
+    17733: "反馈成功",
+    17734: "反馈失败",
+    17735: "反馈识别效果成功",
+    17736: "验证码错误",
     17799: "不明错误发生",
 }
 
@@ -65,8 +87,8 @@ class SearchResponse(pydantic.BaseModel):
 
 
 def search(
-    file_or_url: str,
-    model: SearchModel,
+    file_or_url_or_base64: str,
+    model: SearchModel | str,
     base_url: str = "https://api.animetrace.com",
     endpoint: str = "v1/search",
     is_multi: bool = True,
@@ -74,18 +96,27 @@ def search(
 ):
     url = None
     file_content = None
-    if file_or_url.startswith("http://") or file_or_url.startswith("https://"):
-        url = file_or_url
-    elif (file_path := pathlib.Path(file_or_url)).exists():
+    base64_content = None
+
+    if isinstance(model, SearchModel):
+        model = model.value
+
+    if file_or_url_or_base64.startswith(("http://", "https://")):
+        url = file_or_url_or_base64
+    elif (file_path := pathlib.Path(file_or_url_or_base64)).exists():
+        file_path = pathlib.Path(file_or_url_or_base64)
+        if not file_path.exists():
+            raise ValueError(f"File not found: {file_or_url_or_base64}")
         file_content = file_path.read_bytes()
     else:
-        raise ValueError("Invalid input")
+        base64_content = file_or_url_or_base64
 
     data = {
         "model": model,
         "ai_detect": ai_detect,
         "is_multi": is_multi,
     }
+
     if url:
         response = httpx.post(
             f"{base_url}/{endpoint}",
@@ -97,8 +128,13 @@ def search(
             data=data,
             files={"file": file_content},
         )
+    elif base64_content:
+        response = httpx.post(
+            f"{base_url}/{endpoint}",
+            data={"base64": base64_content, **data},
+        )
     else:
-        assert False, "Not reachable"
+        raise ValueError("No valid input provided")
 
     response.raise_for_status()
     response_model = SearchResponse.model_validate_json(response.content)
